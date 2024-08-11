@@ -2,12 +2,14 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:task_manager/data/models/api_response.dart';
 import 'package:task_manager/data/models/user_model.dart';
 import 'package:task_manager/data/network_caller/api_caller.dart';
 import 'package:task_manager/data/utilities/urls.dart';
 import 'package:task_manager/ui/controller/auth_controller.dart';
+import 'package:task_manager/ui/controller/update_profile_controller.dart';
 import 'package:task_manager/ui/utilities/app_constants.dart';
 import 'package:task_manager/ui/widgets/background_widget.dart';
 import 'package:task_manager/ui/widgets/profile_app_bar.dart';
@@ -39,6 +41,7 @@ class _UpdateProfileScreenState extends State<UpdateProfileScreen> {
     _firstNameTEController.text = AuthController.userData!.firstName ?? '';
     _lastNameTEController.text = AuthController.userData!.lastName ?? '';
     _mobileTEController.text = AuthController.userData!.mobile ?? '';
+    Get.find<UpdateProfileController>();
   }
 
   @override
@@ -133,6 +136,8 @@ class _UpdateProfileScreenState extends State<UpdateProfileScreen> {
                       const SizedBox(height: 10),
                       TextFormField(
                         controller: _passwordTEController,
+                        obscureText: _showPassword == false,
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
                         decoration: InputDecoration(
                           hintText: 'Password',
                           suffixIcon: IconButton(
@@ -151,17 +156,20 @@ class _UpdateProfileScreenState extends State<UpdateProfileScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      Visibility(
-                        visible: _isUpdateProfileInProgress == false,
-                        replacement: const ProgressIndicatorWidget(),
-                        child: ElevatedButton(
-                          onPressed: () {
-                            if (_formKey.currentState!.validate()) {
-                              _updateProfile();
-                            }
-                          },
-                          child: const Icon(Icons.arrow_circle_right_outlined),
-                        ),
+                      GetBuilder<UpdateProfileController>(
+                        builder: (updateProfileController) {
+                          return Visibility(
+                            visible: updateProfileController
+                                    .isUpdateProfileInProgress ==
+                                false,
+                            replacement: const ProgressIndicatorWidget(),
+                            child: ElevatedButton(
+                              onPressed: _updateProfile,
+                              child:
+                                  const Icon(Icons.arrow_circle_right_outlined),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -240,64 +248,46 @@ class _UpdateProfileScreenState extends State<UpdateProfileScreen> {
   }
 
   Future<void> _updateProfile() async {
-    String encodedPhoto = AuthController.userData?.photo ?? '';
-    _isUpdateProfileInProgress = true;
-    if (mounted) {
-      setState(() {});
-    }
+    if (_formKey.currentState!.validate()) {
+      UpdateProfileController updateProfileController =
+          Get.find<UpdateProfileController>();
+      String encodedPhoto = '';
+      String password = '';
 
-    Map<String, dynamic> requestData = {
-      "email": _emailTEController.text.trim(),
-      "firstName": _firstNameTEController.text.trim(),
-      "lastName": _lastNameTEController.text.trim(),
-      "mobile": _mobileTEController.text.trim(),
-      "photo": "",
-    };
+      if (_passwordTEController.text.isNotEmpty) {
+        password = _passwordTEController.text.trim();
+      }
 
-    if (_passwordTEController.text.isNotEmpty) {
-      requestData['password'] = _passwordTEController.text.trim();
-    }
+      if (_selectedImage != null) {
+        File file = File(_selectedImage!.path);
+        encodedPhoto = base64Encode(file.readAsBytesSync());
+      }
 
-    if (_selectedImage != null) {
-      File file = File(_selectedImage!.path);
-      encodedPhoto = base64Encode(file.readAsBytesSync());
-      requestData['photo'] = encodedPhoto;
-    }
-
-    ApiResponse responseData =
-        await ApiCaller.postRequest(Urls.profileUpdate, body: requestData);
-
-    if (responseData.isSuccess &&
-        responseData.responseData['status'] == 'success') {
-      UserModel userData = UserModel(
-        email: _emailTEController.text.trim(),
-        firstName: _firstNameTEController.text.trim(),
-        lastName: _lastNameTEController.text.trim(),
-        mobile: _mobileTEController.text.trim(),
-        photo: encodedPhoto,
+      bool result = await updateProfileController.updateProfile(
+        _emailTEController.text.trim(),
+        _firstNameTEController.text.trim(),
+        _lastNameTEController.text.trim(),
+        _mobileTEController.text.trim(),
+        encodedPhoto,
+        password,
       );
 
-      await AuthController.saveUserData(userData);
-
-      if (mounted) {
-        showSnackBarMessage(
-          context,
-          'Profile update success',
-        );
+      if (result) {
+        if (mounted) {
+          showSnackBarMessage(
+            context,
+            updateProfileController.successMessage,
+          );
+        }
+      } else {
+        if (mounted) {
+          showSnackBarMessage(
+            context,
+            updateProfileController.errorMessage,
+            true,
+          );
+        }
       }
-    } else {
-      if (mounted) {
-        showSnackBarMessage(
-          context,
-          responseData.errorMessage ?? 'Profile update failed! Try again.',
-          true,
-        );
-      }
-    }
-
-    _isUpdateProfileInProgress = false;
-    if (mounted) {
-      setState(() {});
     }
   }
 

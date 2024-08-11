@@ -1,8 +1,10 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:task_manager/data/models/api_response.dart';
 import 'package:task_manager/data/network_caller/api_caller.dart';
 import 'package:task_manager/data/utilities/urls.dart';
+import 'package:task_manager/ui/controller/sign_up_controller.dart';
 import 'package:task_manager/ui/utilities/app_colors.dart';
 import 'package:task_manager/ui/utilities/app_constants.dart';
 import 'package:task_manager/ui/widgets/background_widget.dart';
@@ -25,6 +27,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   bool _showPassword = false;
   bool _isRegistrationInProgress = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Get.find<SignUpController>();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -140,17 +148,20 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      Visibility(
-                        visible: _isRegistrationInProgress == false,
-                        replacement: const ProgressIndicatorWidget(),
-                        child: ElevatedButton(
-                          onPressed: () {
-                            if (_formKey.currentState!.validate()) {
-                              _registration();
-                            }
-                          },
-                          child: const Icon(Icons.arrow_circle_right_outlined),
-                        ),
+                      GetBuilder<SignUpController>(
+                        builder: (signUpController) {
+                          return Visibility(
+                            visible:
+                                signUpController.isRegistrationInProgress ==
+                                    false,
+                            replacement: const ProgressIndicatorWidget(),
+                            child: ElevatedButton(
+                              onPressed: _registration,
+                              child:
+                                  const Icon(Icons.arrow_circle_right_outlined),
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 36),
                       _buildBackToSignInScreen(),
@@ -195,41 +206,29 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   Future<void> _registration() async {
-    _isRegistrationInProgress = true;
-    if (mounted) {
-      setState(() {});
-    }
-    Map<String, dynamic> requestData = {
-      "email": _emailTEController.text.trim(),
-      "firstName": _firstNameTEController.text.trim(),
-      "lastName": _lastNameTEController.text.trim(),
-      "mobile": _mobileTEController.text.trim(),
-      "password": _passwordTEController.text.trim(),
-      "photo": '',
-    };
+    if (_formKey.currentState!.validate()) {
+      SignUpController signUpController = Get.find<SignUpController>();
+      bool result = await signUpController.registration(
+        _emailTEController.text.trim(),
+        _firstNameTEController.text.trim(),
+        _lastNameTEController.text.trim(),
+        _mobileTEController.text.trim(),
+        _passwordTEController.text.trim(),
+      );
 
-    ApiResponse responseData = await ApiCaller.postRequest(
-      Urls.registration,
-      body: requestData,
-    );
-
-    _isRegistrationInProgress = false;
-    if (mounted) {
-      setState(() {});
-    }
-
-    if (responseData.isSuccess) {
-      _clearTextFields();
-      if (mounted) {
-        showSnackBarMessage(context, 'Registration success');
-      }
-    } else {
-      if (mounted) {
-        showSnackBarMessage(
-          context,
-          responseData.errorMessage ?? 'Registration flied! try again',
-          true,
-        );
+      if (result) {
+        _clearTextFields();
+        if (mounted) {
+          showSnackBarMessage(context, signUpController.successMessage);
+        }
+      } else {
+        if (mounted) {
+          showSnackBarMessage(
+            context,
+            signUpController.errorMessage,
+            true,
+          );
+        }
       }
     }
   }

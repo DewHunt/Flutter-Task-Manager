@@ -1,9 +1,8 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:task_manager/data/models/api_response.dart';
-import 'package:task_manager/data/network_caller/api_caller.dart';
-import 'package:task_manager/data/utilities/urls.dart';
+import 'package:get/get.dart';
 import 'package:task_manager/ui/controller/auth_controller.dart';
+import 'package:task_manager/ui/controller/reset_password_controller.dart';
 import 'package:task_manager/ui/screens/auth/sign_in_screen.dart';
 import 'package:task_manager/ui/utilities/app_colors.dart';
 import 'package:task_manager/ui/widgets/background_widget.dart';
@@ -19,11 +18,17 @@ class ResetPasswordScreen extends StatefulWidget {
 
 class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   final TextEditingController _passwordTEController = TextEditingController();
-  final TextEditingController _confirmPasswordTEController = TextEditingController();
+  final TextEditingController _confirmPasswordTEController =
+      TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  bool _isSetPasswordInProgress = false;
   bool _showPassword = false;
   bool _showConfirmPassword = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Get.find<ResetPasswordController>();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -108,17 +113,19 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      Visibility(
-                        visible: _isSetPasswordInProgress == false,
-                        replacement: const ProgressIndicatorWidget(),
-                        child: ElevatedButton(
-                          onPressed: () {
-                            if (_formKey.currentState!.validate()) {
-                              _setPassword();
-                            }
-                          },
-                          child: const Text('Confirm'),
-                        ),
+                      GetBuilder<ResetPasswordController>(
+                        builder: (resetPasswordController) {
+                          return Visibility(
+                            visible: resetPasswordController
+                                    .isSetPasswordInProgress ==
+                                false,
+                            replacement: const ProgressIndicatorWidget(),
+                            child: ElevatedButton(
+                              onPressed: _setPassword,
+                              child: const Text('Confirm'),
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 36),
                       _buildBackToSignInScreen(),
@@ -169,51 +176,31 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   }
 
   Future<void> _setPassword() async {
-    String? verifiedEmail = await AuthController.getVerifiedEmail();
-    String? verifiedOtp = await AuthController.getVerifiedOtp();
-    _isSetPasswordInProgress = true;
-    if (mounted) {
-      setState(() {});
-    }
+    if (_formKey.currentState!.validate()) {
+      ResetPasswordController resetPasswordController =
+          Get.find<ResetPasswordController>();
+      bool result =
+          await resetPasswordController.setPassword(_passwordTEController.text);
 
-    Map<String, dynamic> requestData = {
-      'email': verifiedEmail,
-      'OTP': verifiedOtp,
-      'password': _passwordTEController.text,
-    };
-
-    ApiResponse responseData =
-        await ApiCaller.postRequest(Urls.recoverResetPass, body: requestData);
-
-    if (responseData.isSuccess) {
-      AuthController.clearAllData();
-      _clearTextFields();
-      if (mounted) {
-        showSnackBarMessage(
-          context,
-          'Your new password set successfully',
-        );
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const SignInScreen(),
-          ),
-          (route) => false,
-        );
+      if (result) {
+        AuthController.clearAllData();
+        _clearTextFields();
+        if (mounted) {
+          showSnackBarMessage(
+            context,
+            resetPasswordController.successMessage,
+          );
+        }
+        Get.offAll(() => const SignInScreen());
+      } else {
+        if (mounted) {
+          showSnackBarMessage(
+            context,
+            resetPasswordController.errorMessage,
+            true,
+          );
+        }
       }
-    } else {
-      if (mounted) {
-        showSnackBarMessage(
-          context,
-          responseData.errorMessage ?? 'Set password failed! Try again.',
-          true,
-        );
-      }
-    }
-
-    _isSetPasswordInProgress = false;
-    if (mounted) {
-      setState(() {});
     }
   }
 

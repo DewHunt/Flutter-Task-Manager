@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:task_manager/data/models/api_response.dart';
 import 'package:task_manager/data/models/task_list_wrapper_model.dart';
 import 'package:task_manager/data/models/task_model.dart';
 import 'package:task_manager/data/network_caller/api_caller.dart';
 import 'package:task_manager/data/utilities/urls.dart';
+import 'package:task_manager/ui/controller/progress_task_controller.dart';
 import 'package:task_manager/ui/widgets/progress_indicator_widget.dart';
 import 'package:task_manager/ui/widgets/snack_bar_message_widget.dart';
 import 'package:task_manager/ui/widgets/task_item_card.dart';
@@ -22,7 +24,11 @@ class _ProgressTaskScreenState extends State<ProgressTaskScreen> {
   @override
   void initState() {
     super.initState();
-    _getProgressTaskLists();
+    _initialCall();
+  }
+
+  void _initialCall() {
+    Get.find<ProgressTaskController>().getProgressTaskLists();
   }
 
   @override
@@ -35,23 +41,25 @@ class _ProgressTaskScreenState extends State<ProgressTaskScreen> {
             Expanded(
               child: RefreshIndicator(
                 onRefresh: () async {
-                  _getProgressTaskLists();
+                  _initialCall();
                 },
-                child: Visibility(
-                  visible: _isGetProgressTaskListsInProgress == false,
-                  replacement: const ProgressIndicatorWidget(),
-                  child: ListView.builder(
-                    itemCount: progressTaskLists.length,
-                    itemBuilder: (context, index) {
-                      return TaskItemCard(
-                        task: progressTaskLists[index],
-                        defaultTaskStatus: 'Progress',
-                        onUpdateTask: () {
-                          _getProgressTaskLists();
+                child: GetBuilder<ProgressTaskController>(
+                  builder: (progressTaskController) {
+                    return Visibility(
+                      visible: progressTaskController.isGetProgressTaskListsInProgress == false,
+                      replacement: const ProgressIndicatorWidget(),
+                      child: ListView.builder(
+                        itemCount: progressTaskController.taskLists.length,
+                        itemBuilder: (context, index) {
+                          return TaskItemCard(
+                            task: progressTaskController.taskLists[index],
+                            defaultTaskStatus: 'Progress',
+                            onUpdateTask: _initialCall,
+                          );
                         },
-                      );
-                    },
-                  ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
@@ -59,35 +67,5 @@ class _ProgressTaskScreenState extends State<ProgressTaskScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _getProgressTaskLists() async {
-    _isGetProgressTaskListsInProgress = true;
-    if (mounted) {
-      setState(() {});
-    }
-
-    ApiResponse responseData =
-        await ApiCaller.getRequest(Urls.progressTaskList);
-
-    if (responseData.isSuccess) {
-      TaskListWrapperModel taskListWrapperModel =
-          TaskListWrapperModel.fromJson(responseData.responseData);
-      progressTaskLists = taskListWrapperModel.task ?? [];
-    } else {
-      if (mounted) {
-        showSnackBarMessage(
-          context,
-          responseData.errorMessage ??
-              'Get progress task lists failed! Try again',
-          true,
-        );
-      }
-    }
-
-    _isGetProgressTaskListsInProgress = false;
-    if (mounted) {
-      setState(() {});
-    }
   }
 }

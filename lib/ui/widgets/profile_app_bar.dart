@@ -41,20 +41,20 @@ AppBar profileAppBar(context, [bool isFromUpdateProfileScreen = false]) {
         ],
       ),
     ),
-    leading: Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(50),
-        child: CircleAvatar(
-          radius: 10,
-          child: Image.memory(
-            base64Decode(
-              AuthController.userData?.photo ?? '',
-            ),
-          ),
-        ),
-      ),
-    ),
+    // leading: Padding(
+    //   padding: const EdgeInsets.all(8.0),
+    //   child: ClipRRect(
+    //     borderRadius: BorderRadius.circular(50),
+    //     child: CircleAvatar(
+    //       radius: 10,
+    //       child: Image.memory(
+    //         base64Decode(
+    //           AuthController.userData?.photo ?? '',
+    //         ),
+    //       ),
+    //     ),
+    //   ),
+    // ),
     actions: [
       IconButton(
         onPressed: () async {

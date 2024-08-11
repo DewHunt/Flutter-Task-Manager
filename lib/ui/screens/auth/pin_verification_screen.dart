@@ -1,10 +1,8 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
-import 'package:task_manager/data/models/api_response.dart';
-import 'package:task_manager/data/network_caller/api_caller.dart';
-import 'package:task_manager/data/utilities/urls.dart';
-import 'package:task_manager/ui/controller/auth_controller.dart';
+import 'package:task_manager/ui/controller/pin_verification_controller.dart';
 import 'package:task_manager/ui/screens/auth/reset_password_screen.dart';
 import 'package:task_manager/ui/screens/auth/sign_in_screen.dart';
 import 'package:task_manager/ui/utilities/app_colors.dart';
@@ -22,8 +20,13 @@ class PinVerificationScreen extends StatefulWidget {
 class _PinVerificationScreenState extends State<PinVerificationScreen> {
   final TextEditingController _pinTEController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  bool _isVerifyOtpInProgress = false;
   String _verifyOtpMessage = '';
+
+  @override
+  void initState() {
+    super.initState();
+    Get.find<PinVerificationController>();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,17 +54,19 @@ class _PinVerificationScreenState extends State<PinVerificationScreen> {
                       const SizedBox(height: 16),
                       _buildPinCodeTextField(),
                       const SizedBox(height: 5),
-                      Visibility(
-                        visible: _isVerifyOtpInProgress == false,
-                        replacement: const ProgressIndicatorWidget(),
-                        child: ElevatedButton(
-                          onPressed: () {
-                            if (_formKey.currentState!.validate()) {
-                              _verifyOtp();
-                            }
-                          },
-                          child: const Text('Verify'),
-                        ),
+                      GetBuilder<PinVerificationController>(
+                        builder: (pinVerificationController) {
+                          return Visibility(
+                            visible: pinVerificationController
+                                    .isVerifyOtpInProgress ==
+                                false,
+                            replacement: const ProgressIndicatorWidget(),
+                            child: ElevatedButton(
+                              onPressed: _verifyOtp,
+                              child: const Text('Verify'),
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 5),
                       Text(
@@ -149,54 +154,36 @@ class _PinVerificationScreenState extends State<PinVerificationScreen> {
   }
 
   Future<void> _verifyOtp() async {
-    String? verifiedEmail = await AuthController.getVerifiedEmail();
-    _isVerifyOtpInProgress = true;
-    if (mounted) {
-      setState(() {});
-    }
+    if (_formKey.currentState!.validate()) {
+      PinVerificationController pinVerificationController =
+          Get.find<PinVerificationController>();
+      bool result = await pinVerificationController
+          .verifyOtp(_pinTEController.text.trim());
 
-    ApiResponse responseData = await ApiCaller.getRequest(
-      Urls.recoverVerifyOTP(
-        verifiedEmail!,
-        _pinTEController.text.trim(),
-      ),
-    );
-
-    if (responseData.isSuccess) {
-      if (responseData.responseData['status'] == 'success') {
-        AuthController.saveVerifyOtp(_pinTEController.text.trim());
-        _pinTEController.clear();
-        if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const ResetPasswordScreen(),
-            ),
-          );
+      if (result) {
+        if (pinVerificationController.isVerifiedOtp) {
+          _pinTEController.clear();
+          Get.offAll(() => const ResetPasswordScreen());
+        } else {
+          _verifyOtpMessage = pinVerificationController.errorMessage;
+          if (mounted) {
+            showSnackBarMessage(
+              context,
+              _verifyOtpMessage,
+              true,
+            );
+            setState(() {});
+          }
         }
       } else {
-        _verifyOtpMessage = 'Invalid OTP code! Try again.';
         if (mounted) {
           showSnackBarMessage(
             context,
-            _verifyOtpMessage,
+            pinVerificationController.errorMessage,
             true,
           );
         }
       }
-    } else {
-      if (mounted) {
-        showSnackBarMessage(
-          context,
-          responseData.errorMessage ?? 'Verify email failed! Try again.',
-          true,
-        );
-      }
-    }
-
-    _isVerifyOtpInProgress = false;
-    if (mounted) {
-      setState(() {});
     }
   }
 

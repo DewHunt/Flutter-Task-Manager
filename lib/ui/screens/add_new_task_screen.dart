@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:task_manager/data/models/api_response.dart';
-import 'package:task_manager/data/network_caller/api_caller.dart';
-import 'package:task_manager/data/utilities/urls.dart';
+import 'package:get/get.dart';
+import 'package:task_manager/ui/controller/add_new_task_controller.dart';
 import 'package:task_manager/ui/widgets/background_widget.dart';
 import 'package:task_manager/ui/widgets/profile_app_bar.dart';
 import 'package:task_manager/ui/widgets/progress_indicator_widget.dart';
@@ -19,7 +18,13 @@ class _AddNewTaskScreenState extends State<AddNewTaskScreen> {
   final TextEditingController _descriptionTEController =
       TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  bool _isAddNewTaskInProgress = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final AddNewTaskController addNewTaskController =
+    Get.find<AddNewTaskController>();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,18 +69,19 @@ class _AddNewTaskScreenState extends State<AddNewTaskScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      Visibility(
-                        visible: _isAddNewTaskInProgress == false,
-                        replacement: const ProgressIndicatorWidget(),
-                        child: ElevatedButton(
-                          onPressed: () {
-                            if (_formKey.currentState!.validate()) {
-                              _addNewTask();
-                            }
-                          },
-                          child: const Text('Add'),
-                        ),
-                      ),
+                      GetBuilder<AddNewTaskController>(
+                          builder: (addNewTaskController) {
+                        return Visibility(
+                          visible:
+                              addNewTaskController.isAddNewTaskInProgress ==
+                                  false,
+                          replacement: const ProgressIndicatorWidget(),
+                          child: ElevatedButton(
+                            onPressed: _addNewTask,
+                            child: const Text('Add'),
+                          ),
+                        );
+                      }),
                     ],
                   ),
                 ),
@@ -88,37 +94,28 @@ class _AddNewTaskScreenState extends State<AddNewTaskScreen> {
   }
 
   Future<void> _addNewTask() async {
-    _isAddNewTaskInProgress = true;
-    if (mounted) {
-      setState(() {});
-    }
+    if (_formKey.currentState!.validate()) {
+      final AddNewTaskController addNewTaskController =
+          Get.find<AddNewTaskController>();
+      final bool result = await addNewTaskController.addNewTask(
+        _titleTEController.text.trim(),
+        _descriptionTEController.text.trim(),
+        "New",
+      );
 
-    Map<String, dynamic> requestData = {
-      "title": _titleTEController.text.trim(),
-      "description": _descriptionTEController.text.trim(),
-      "status": "New",
-    };
-
-    ApiResponse responseData =
-        await ApiCaller.postRequest(Urls.createTask, body: requestData);
-
-    _isAddNewTaskInProgress = false;
-    if (mounted) {
-      setState(() {});
-    }
-
-    if (responseData.isSuccess) {
-      _clearTextFields();
-      if (mounted) {
-        showSnackBarMessage(context, 'New task added');
-      }
-    } else {
-      if (mounted) {
-        showSnackBarMessage(
-          context,
-          responseData.errorMessage ?? 'Add new task failed! Try again',
-          true,
-        );
+      if (result) {
+        _clearTextFields();
+        if (mounted) {
+          showSnackBarMessage(context, addNewTaskController.message);
+        }
+      } else {
+        if (mounted) {
+          showSnackBarMessage(
+            context,
+            addNewTaskController.message,
+            true,
+          );
+        }
       }
     }
   }
